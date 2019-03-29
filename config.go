@@ -317,7 +317,7 @@ func (c *Config) Load(files ...string) error {
 // Note that this method will NOT clear the existing configuration data.
 func (c *Config) LoadReader(reader io.Reader, format string) error {
 	var data interface{}
-	if err := loadReader(reader, format, data); err != nil {
+	if err := loadReader(reader, format, &data); err != nil {
 		return err
 	}
 	c.data = merge(c.data, reflect.ValueOf(data))
