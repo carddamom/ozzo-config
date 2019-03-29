@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -22,6 +23,9 @@ import (
 
 // UnmarshalFunc parses the given configuration and populates it into the given variable.
 type UnmarshalFunc func([]byte, interface{}) error
+
+// UnmarshalReaderFunc parses the given configuration and populates it into the given variable.
+type UnmarshalReaderFunc func(io.Reader, interface{}) error
 
 // UnmarshalFuncMap maps configuration file extensions to the corresponding unmarshal functions.
 var UnmarshalFuncMap = map[string]UnmarshalFunc{
@@ -38,6 +42,30 @@ var UnmarshalFuncMap = map[string]UnmarshalFunc{
 	},
 	".toml": func(bytes []byte, data interface{}) error {
 		_, err := toml.Decode(string(bytes), data)
+		return err
+	},
+}
+
+// UnmarshalReaderFuncMap maps configuration file extensions to the corresponding unmarshal functions.
+var UnmarshalReaderFuncMap = map[string]UnmarshalReaderFunc{
+	".yaml": func(reader io.Reader, data interface{}) error {
+		return yaml.NewDecoder(reader).Decode(data)
+	},
+	".yml": func(reader io.Reader, data interface{}) error {
+		return yaml.NewDecoder(reader).Decode(data)
+	},
+	".json": func(reader io.Reader, data interface{}) (err error) {
+		bytes, err := stripJSONCommentsReader(reader)
+		if err != nil {
+			return
+		}
+		if err = json.Unmarshal(bytes, data); err != nil {
+			return
+		}
+		return nil
+	},
+	".toml": func(reader io.Reader, data interface{}) error {
+		_, err := toml.DecodeReader(reader, data)
 		return err
 	},
 }
@@ -317,6 +345,14 @@ func load(file string, data interface{}) error {
 	return FileTypeError(file)
 }
 
+// loadReader reads and parses a JSON, YAML, or TOML reader.
+func loadReader(file io.Reader, ext string, data interface{}) error {
+	if unmarshal, ok := UnmarshalReaderFuncMap[ext]; ok {
+		return unmarshal(file, data)
+	}
+	return FileTypeError("")
+}
+
 func merge(v1, v2 reflect.Value) reflect.Value {
 	if v1.Kind() != reflect.Map || v2.Kind() != reflect.Map || !v1.IsValid() {
 		return v2
@@ -393,6 +429,14 @@ func stripJSONComments(s []byte) ([]byte, error) {
 	reader := bytes.NewBuffer(s)
 	if err := jsonpreprocess.WriteCommentTrimmedTo(&out, reader); err != nil {
 		return s, err
+	}
+	return out.Bytes(), nil
+}
+
+func stripJSONCommentsReader(reader io.Reader) ([]byte, error) {
+	var out bytes.Buffer
+	if err := jsonpreprocess.WriteCommentTrimmedTo(&out, reader); err != nil {
+		return nil, err
 	}
 	return out.Bytes(), nil
 }
