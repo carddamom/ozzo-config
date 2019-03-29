@@ -308,6 +308,22 @@ func (c *Config) Load(files ...string) error {
 	return nil
 }
 
+// LoadReader loads configuration data from one reader.
+//
+// Supported configuration file formats include JSON, YAML, and TOML. The file formats
+// are determined by the file name extensions (.json, .yaml, .yml, .toml).
+// The method will return any file reading or parsing errors.
+//
+// Note that this method will NOT clear the existing configuration data.
+func (c *Config) LoadReader(reader io.Reader, format string) error {
+	var data interface{}
+	if err := loadReader(reader, format, data); err != nil {
+		return err
+	}
+	c.data = merge(c.data, reflect.ValueOf(data))
+	return nil
+}
+
 // LoadJSON loads new configuration data which are given as JSON strings.
 //
 // If multiple JSON strings are given, the corresponding configuration data will be merged
