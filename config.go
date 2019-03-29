@@ -50,14 +50,14 @@ func (s FileTypeError) Error() string {
 	return "File format not supported: " + filepath.Ext(string(s))
 }
 
-// ConfigPathError describes a path which cannot be used to set a configuration value.
-type ConfigPathError struct {
+// PathError describes a path which cannot be used to set a configuration value.
+type PathError struct {
 	Path    string
 	Message string
 }
 
 // Error returns the error message represented by ConfigPathError
-func (s *ConfigPathError) Error() string {
+func (s *PathError) Error() string {
 	return fmt.Sprintf("%q is not a valid path: %v", s.Path, s.Message)
 }
 
@@ -144,7 +144,7 @@ func (c *Config) GetString(path string, defaultValue ...string) string {
 	return c.Get(path, d).(string)
 }
 
-// GetString retrieves the int-typed configuration value corresponding to the specified path.
+// GetInt retrieves the int-typed configuration value corresponding to the specified path.
 // Please refer to Get for the detailed usage explanation.
 func (c *Config) GetInt(path string, defaultValue ...int) int {
 	var d int
@@ -154,7 +154,7 @@ func (c *Config) GetInt(path string, defaultValue ...int) int {
 	return c.Get(path, d).(int)
 }
 
-// GetString retrieves the int64-typed configuration value corresponding to the specified path.
+// GetInt64 retrieves the int64-typed configuration value corresponding to the specified path.
 // Please refer to Get for the detailed usage explanation.
 func (c *Config) GetInt64(path string, defaultValue ...int64) int64 {
 	var d int64
@@ -164,7 +164,7 @@ func (c *Config) GetInt64(path string, defaultValue ...int64) int64 {
 	return c.Get(path, d).(int64)
 }
 
-// GetString retrieves the float64-typed configuration value corresponding to the specified path.
+// GetFloat retrieves the float64-typed configuration value corresponding to the specified path.
 // Please refer to Get for the detailed usage explanation.
 func (c *Config) GetFloat(path string, defaultValue ...float64) float64 {
 	var d float64
@@ -174,7 +174,7 @@ func (c *Config) GetFloat(path string, defaultValue ...float64) float64 {
 	return c.Get(path, d).(float64)
 }
 
-// GetString retrieves the bool-typed configuration value corresponding to the specified path.
+// GetBool retrieves the bool-typed configuration value corresponding to the specified path.
 // Please refer to Get for the detailed usage explanation.
 func (c *Config) GetBool(path string, defaultValue ...bool) bool {
 	d := false
@@ -207,12 +207,12 @@ func (c *Config) Set(path string, value interface{}) error {
 		switch data.Kind() {
 		case reflect.Map, reflect.Slice, reflect.Array:
 		default:
-			return &ConfigPathError{strings.Join(parts[:i+1], "."), fmt.Sprintf("got %v instead of a map, array, or slice", data.Kind())}
+			return &PathError{strings.Join(parts[:i+1], "."), fmt.Sprintf("got %v instead of a map, array, or slice", data.Kind())}
 		}
 
 		if i == n-1 {
 			if err := setElement(data, parts[i], value); err != nil {
-				return &ConfigPathError{path, err.Error()}
+				return &PathError{path, err.Error()}
 			}
 			return nil
 		}
@@ -225,7 +225,7 @@ func (c *Config) Set(path string, value interface{}) error {
 
 		newMap := make(map[string]interface{})
 		if err := setElement(data, parts[i], newMap); err != nil {
-			return &ConfigPathError{strings.Join(parts[:i+1], "."), err.Error()}
+			return &PathError{strings.Join(parts[:i+1], "."), err.Error()}
 		}
 
 		data = reflect.ValueOf(newMap)

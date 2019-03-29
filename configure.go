@@ -12,25 +12,25 @@ import (
 	"strings"
 )
 
-// ConfigValueError describes a configuration that cannot be used to configure a target value
-type ConfigValueError struct {
+// ValueError describes a configuration that cannot be used to configure a target value
+type ValueError struct {
 	Path    string // path to the configuration value
 	Message string // the detailed error message
 }
 
-// Error returns the error message represented by ConfigValueError
-func (e *ConfigValueError) Error() string {
+// Error returns the error message represented by ValueError
+func (e *ValueError) Error() string {
 	path := strings.Trim(e.Path, ".")
 	return fmt.Sprintf("%q points to an inappropriate configuration value: %v", path, e.Message)
 }
 
-// ConfigTargetError describes a target value that cannot be configured
-type ConfigTargetError struct {
+// TargetError describes a target value that cannot be configured
+type TargetError struct {
 	Value reflect.Value
 }
 
-// Error returns the error message represented by ConfigTargetError
-func (e *ConfigTargetError) Error() string {
+// Error returns the error message represented by TargetError
+func (e *TargetError) Error() string {
 	if e.Value.Kind() != reflect.Ptr {
 		return "Unable to configure a non-pointer"
 	}
@@ -97,7 +97,7 @@ func (c *Config) Configure(v interface{}, path ...string) (err error) {
 
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return &ConfigTargetError{rv}
+		return &TargetError{rv}
 	}
 
 	p := ""
@@ -105,7 +105,7 @@ func (c *Config) Configure(v interface{}, path ...string) (err error) {
 	if len(path) > 0 {
 		d := c.Get(path[0])
 		if d == nil {
-			return &ConfigPathError{path[0], "no configuration value was found"}
+			return &PathError{path[0], "no configuration value was found"}
 		}
 		p = path[0]
 		config = reflect.ValueOf(d)
@@ -138,7 +138,7 @@ func (c *Config) configure(v, config reflect.Value, path string) error {
 		case reflect.Map:
 			return c.configureMap(v, config, path)
 		default:
-			return &ConfigValueError{path, "a map cannot be used to configure " + v.Type().String()}
+			return &ValueError{path, "a map cannot be used to configure " + v.Type().String()}
 		}
 		return c.configureMap(v, config, path)
 	default:
@@ -158,7 +158,7 @@ func (c *Config) configureArray(v, config reflect.Value, path string) error {
 	}
 
 	if vkind != reflect.Array && vkind != reflect.Slice {
-		return &ConfigValueError{path, fmt.Sprintf("%v cannot be used to configure %v", config.Type(), v.Type())}
+		return &ValueError{path, fmt.Sprintf("%v cannot be used to configure %v", config.Type(), v.Type())}
 	}
 
 	n := config.Len()
@@ -224,10 +224,10 @@ func (c *Config) configureStruct(v, config reflect.Value, path string) error {
 		path = path + "." + k.String()
 		field := v.FieldByName(k.Interface().(string))
 		if !field.IsValid() {
-			return &ConfigValueError{path, fmt.Sprintf("field %v not found in struct %v", k.String(), v.Type())}
+			return &ValueError{path, fmt.Sprintf("field %v not found in struct %v", k.String(), v.Type())}
 		}
 		if !field.CanSet() {
-			return &ConfigValueError{path, fmt.Sprintf("field %v cannot be set", k.String())}
+			return &ValueError{path, fmt.Sprintf("field %v cannot be set", k.String())}
 		}
 		if field.Kind() == reflect.Ptr {
 			if field.IsNil() {
@@ -252,22 +252,22 @@ func (c *Config) configureInterface(v, config reflect.Value, path string) error 
 
 	tk := mapIndex(config, typeKey)
 	if !tk.IsValid() {
-		return &ConfigValueError{path, "missing the type element"}
+		return &ValueError{path, "missing the type element"}
 	}
 	if tk.Kind() != reflect.String {
-		return &ConfigValueError{path, "type must be a string"}
+		return &ValueError{path, "type must be a string"}
 	}
 
 	builder, ok := c.types[tk.String()]
 	if !ok {
-		return &ConfigValueError{path, fmt.Sprintf("type %q is unknown", tk.String())}
+		return &ValueError{path, fmt.Sprintf("type %q is unknown", tk.String())}
 	}
 
 	object := builder.Call([]reflect.Value{})[0]
 
 	s := indirect(object)
 	if !s.Addr().Type().Implements(v.Type()) {
-		return &ConfigValueError{path, fmt.Sprintf("%v does not implement %v", s.Type(), v.Type())}
+		return &ValueError{path, fmt.Sprintf("%v does not implement %v", s.Type(), v.Type())}
 	}
 	v.Set(object)
 
@@ -295,7 +295,7 @@ func (c *Config) configureScalar(v, config reflect.Value, path string) error {
 		return nil
 	}
 
-	return &ConfigValueError{path, fmt.Sprintf("%v cannot be used to configure %v", config.Type(), v.Type())}
+	return &ValueError{path, fmt.Sprintf("%v cannot be used to configure %v", config.Type(), v.Type())}
 }
 
 func indirect(v reflect.Value) reflect.Value {
